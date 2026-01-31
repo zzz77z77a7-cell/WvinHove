@@ -1,4 +1,5 @@
 name: Compute Node
+
 on: [workflow_dispatch]
 
 jobs:
@@ -6,104 +7,124 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 360
 
+    env:
+      ANYDESK_PASSWORD: joyzonetech2025   # ← change this if you want
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Install Chocolatey + AnyDesk + tools
         shell: pwsh
         run: |
-          # Write installer script
           @'
           @echo off
-          echo Starting AnyDesk + tools installation...
+          echo =============================================
+          echo   Starting AnyDesk + tools installation...
+          echo =============================================
 
-          REM Install Chocolatey if not already present
+          REM Install Chocolatey if missing
           if not exist "%ProgramData%\chocolatey\choco.exe" (
+              echo Installing Chocolatey...
               powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
           )
 
-          choco install anydesk -y --ignore-checksums --force --no-progress --pre || echo Chocolatey AnyDesk install failed
+          echo Installing AnyDesk...
+          choco install anydesk -y --ignore-checksums --force --no-progress --pre || echo AnyDesk install failed - continuing anyway
 
-          pip install pyautogui --quiet || echo pyautogui install failed
-          pip install psutil --quiet   || echo psutil install failed
+          echo Installing Python packages...
+          pip install pyautogui --quiet || echo pyautogui failed
+          pip install psutil   --quiet || echo psutil failed
 
-          curl -s -L -o "%PUBLIC%\Desktop\Telegram.exe" https://telegram.org/dl/desktop/win64
-          curl -s -L -o "%PUBLIC%\Desktop\Winrar.exe"   https://www.rarlab.com/rar/winrar-x64-621.exe
+          echo Downloading extras...
+          curl -s -L -o "%PUBLIC%\Desktop\Telegram.exe"     https://telegram.org/dl/desktop/win64
+          curl -s -L -o "%PUBLIC%\Desktop\Winrar.exe"       https://www.rarlab.com/rar/winrar-x64-621.exe
           powershell -Command "Invoke-WebRequest -Uri 'https://github.com/chieunhatnang/VM-QuickConfig/releases/download/1.6.1/VMQuickConfig.exe' -OutFile '%PUBLIC%\Desktop\VMQuickConfig.exe'"
 
           if exist "%PUBLIC%\Desktop\Telegram.exe" (
+              echo Installing Telegram silently...
               "%PUBLIC%\Desktop\Telegram.exe" /VERYSILENT /NORESTART
               del "%PUBLIC%\Desktop\Telegram.exe"
           )
 
           if exist "%PUBLIC%\Desktop\Winrar.exe" (
+              echo Installing WinRAR silently...
               "%PUBLIC%\Desktop\Winrar.exe" /S
               del "%PUBLIC%\Desktop\Winrar.exe"
           )
 
+          echo Cleaning desktop shortcuts...
           del /f /q "%PUBLIC%\Desktop\Epic Games Launcher.lnk"   2>nul
           del /f /q "%PUBLIC%\Desktop\Unity Hub.lnk"             2>nul
 
-          net user runneradmin @#Joyzonetech123456
+          echo Setting runneradmin password...
+          net user runneradmin %ANYDESK_PASSWORD%
 
-          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" /v "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" /t REG_DWORD /d 0 /f
+          echo Hiding some desktop icons...
+          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" /v "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" /t REG_DWORD /d 0 /f >nul 2>&1
 
+          echo Setting time zone...
           tzutil /s "Pacific Standard Time"
 
-          echo Installation finished.
+          echo =============================================
+          echo   Installation step finished
+          echo =============================================
           '@ | Set-Content -Path "install.bat" -Encoding ascii -NoNewline
 
           cmd /c install.bat
-          Get-Content install.bat   # for debugging in log
 
-      - name: Create & Run AnyDesk Guard
+      - name: Launch AnyDesk + set password + show ID
         shell: pwsh
         run: |
-          # Write guard script with safer path detection
           @'
           @echo off
-          title AnyDesk Guard
+          title AnyDesk - GitHub Actions session
 
-          set "ANYDESK_EXE=%ProgramData%\chocolatey\lib\anydesk.portable\tools\AnyDesk.exe"
+          set "ANYDESK=%ProgramData%\chocolatey\lib\anydesk.portable\tools\AnyDesk.exe"
+          set "ID="
 
-          if not exist "%ANYDESK_EXE%" (
-              echo ERROR: AnyDesk.exe not found at %ANYDESK_EXE%
-              timeout /t 10
+          if not exist "%ANYDESK%" (
+              echo ERROR ─ AnyDesk.exe not found
+              echo Path checked: %ANYDESK%
+              timeout /t 15
               exit /b 1
           )
 
-          :LOOP
-          echo [Guard] Starting AnyDesk...
-          start "" "%ANYDESK_EXE%" --start
+          echo Launching AnyDesk...
+          start "" "%ANYDESK%" --start
 
-          timeout /t 6 /nobreak >nul
+          echo Waiting for AnyDesk to initialize...
+          timeout /t 8 /nobreak >nul
 
-          for /f "delims=" %%A in ('"%ANYDESK_EXE%" --get-id 2^>nul') do set "ID=%%A"
+          echo Trying to get AnyDesk ID...
+          for /f "delims=" %%i in ('"%ANYDESK%" --get-id 2^>nul') do set "ID=%%i"
 
           if "!ID!"=="" (
-              echo [Guard] No ID - killing and retrying...
-              taskkill /f /im AnyDesk.exe 2>nul
-              goto LOOP
+              echo ID not received yet ─ waiting longer...
+              timeout /t 12 /nobreak >nul
+              for /f "delims=" %%i in ('"%ANYDESK%" --get-id 2^>nul') do set "ID=%%i"
           )
 
-          if "!ID!"=="0" (
-              echo [Guard] ID is 0 - killing and retrying...
-              taskkill /f /im AnyDesk.exe 2>nul
-              goto LOOP
+          if "!ID!"=="" (
+              echo WARNING ─ Could not read AnyDesk ID automatically
+              echo You may need to connect without password first or check logs
+          ) else (
+              echo.
+              echo AnyDesk ID:           !ID!
+              echo Password:             %ANYDESK_PASSWORD%
+              echo.
+              echo Use this to connect → AnyDesk client on your computer
           )
 
-          echo joyzonetech | "%ANYDESK_EXE%" --set-password _full_access
+          echo Setting unattended access password...
+          "%ANYDESK%" --set-password %ANYDESK_PASSWORD% --with-password
 
-          echo.
-          echo AnyDesk ID ............ : !ID!
-          echo AnyDesk Password ...... : @#Joyzonetech123456
-          echo.
           echo Starting VMQuickConfig...
           start "" /MAX "%PUBLIC%\Desktop\VMQuickConfig.exe"
 
-          echo Running auto-clicks...
+          echo Running click automation...
           python -c "import pyautogui as p; p.click(147, 489, duration=2)"
           python -c "import pyautogui as p; p.click(156, 552, duration=2)"
           python -c "import pyautogui as p; p.click(587, 14,  duration=2)"
@@ -111,8 +132,9 @@ jobs:
           python -c "import pyautogui as p; p.click(897, 64,  duration=2)"
 
           echo.
-          echo Guard active - press Ctrl+C in this window to stop
+          echo Session ready ─ AnyDesk should be accessible now
+          echo Press any key to acknowledge (or just let the job run)
           pause
-          '@ | Set-Content -Path "guard.bat" -Encoding ascii -NoNewline
+          '@ | Set-Content -Path "start-anydesk.bat" -Encoding ascii -NoNewline
 
-          cmd /c guard.bat
+          cmd /c start-anydesk.bat
