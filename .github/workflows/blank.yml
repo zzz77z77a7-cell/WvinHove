@@ -1,117 +1,7 @@
-name: Compute Node
+          REM ──────────────────────────────────────────────
+          REM Final display + infinite keep-alive
+          REM ──────────────────────────────────────────────
 
-on: [workflow_dispatch]
-
-jobs:
-  node:
-    runs-on: windows-2022
-    timeout-minutes: 360
-
-    env:
-      ANYDESK_PASSWORD: joyzonetech2025   # change if you want
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install Chocolatey + AnyDesk + tools
-        shell: pwsh
-        run: |
-          @'
-          @echo off
-          echo =============================================
-          echo   Starting AnyDesk + tools installation...
-          echo =============================================
-
-          if not exist "%ProgramData%\chocolatey\choco.exe" (
-              echo Installing Chocolatey...
-              powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
-          )
-
-          choco install anydesk -y --ignore-checksums --force --no-progress --pre || echo AnyDesk install failed - continuing
-
-          pip install pyautogui --quiet || echo pyautogui failed
-          pip install psutil   --quiet || echo psutil failed
-
-          curl -s -L -o "%PUBLIC%\Desktop\Telegram.exe"     https://telegram.org/dl/desktop/win64
-          curl -s -L -o "%PUBLIC%\Desktop\Winrar.exe"       https://www.rarlab.com/rar/winrar-x64-621.exe
-          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/chieunhatnang/VM-QuickConfig/releases/download/1.6.1/VMQuickConfig.exe' -OutFile '%PUBLIC%\Desktop\VMQuickConfig.exe'"
-
-          if exist "%PUBLIC%\Desktop\Telegram.exe" (
-              "%PUBLIC%\Desktop\Telegram.exe" /VERYSILENT /NORESTART
-              del "%PUBLIC%\Desktop\Telegram.exe"
-          )
-
-          if exist "%PUBLIC%\Desktop\Winrar.exe" (
-              "%PUBLIC%\Desktop\Winrar.exe" /S
-              del "%PUBLIC%\Desktop\Winrar.exe"
-          )
-
-          del /f /q "%PUBLIC%\Desktop\Epic Games Launcher.lnk"   2>nul
-          del /f /q "%PUBLIC%\Desktop\Unity Hub.lnk"             2>nul
-
-          net user runneradmin %ANYDESK_PASSWORD%
-
-          reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" /v "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" /t REG_DWORD /d 0 /f >nul 2>&1
-
-          tzutil /s "Pacific Standard Time"
-
-          echo Installation finished.
-          '@ | Set-Content -Path "install.bat" -Encoding ascii -NoNewline
-
-          cmd /c install.bat
-
-      - name: Launch AnyDesk + set password + show ID
-        shell: pwsh
-        run: |
-          @'
-          @echo off
-          setlocal EnableDelayedExpansion
-
-          title AnyDesk - GitHub Actions session
-
-          set "ANYDESK=%ProgramData%\chocolatey\lib\anydesk.portable\tools\AnyDesk.exe"
-          set "ID="
-
-          if not exist "!ANYDESK!" (
-              echo ERROR - AnyDesk.exe not found at !ANYDESK!
-              powershell -Command "Start-Sleep -Seconds 20"
-              exit /b 1
-          )
-
-          echo Launching AnyDesk...
-          start "" "!ANYDESK!" --start
-
-          echo Waiting 20 seconds for AnyDesk startup...
-          powershell -Command "Start-Sleep -Seconds 20"
-
-          echo Debug: Capturing AnyDesk ID...
-          echo Command: "!ANYDESK!" --get-id
-          "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
-
-          set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
-          echo Raw ID from file: [!RAW_ID!]
-
-          REM Treat raw value as ID (it's already valid)
-          set "ID=!RAW_ID!"
-
-          REM Critical actions - run regardless of parsing issues
-          echo Setting unattended password...
-          "!ANYDESK!" --set-password %ANYDESK_PASSWORD% --with-password
-
-          echo Starting VMQuickConfig...
-          start "" /MAX "%PUBLIC%\Desktop\VMQuickConfig.exe"
-
-          echo Running click automation...
-          python -c "import pyautogui as p; p.click(147, 489, duration=2)"
-          python -c "import pyautogui as p; p.click(156, 552, duration=2)"
-          python -c "import pyautogui as p; p.click(587, 14,  duration=2)"
-          python -c "import pyautogui as p; p.click(916, 17,  duration=2)"
-          python -c "import pyautogui as p; p.click(897, 64,  duration=2)"
-
-          REM Final display
           if "!ID!"=="" (
               echo WARNING - No ID captured.
               echo Last raw output: [!RAW_ID!]
@@ -123,12 +13,13 @@ jobs:
               echo Password:             %ANYDESK_PASSWORD%
               echo =============================================
               echo Connect from your local AnyDesk client now.
-              echo Job will keep running for 6 hours.
           )
 
           echo.
-          echo Session ready.
-          pause
-          '@ | Set-Content -Path "start-anydesk.bat" -Encoding ascii -NoNewline
+          echo Session ready - keeping alive...
+          echo.
 
-          cmd /c start-anydesk.bat
+          :KEEP_ALIVE
+          echo [Alive] AnyDesk ready - ID: !ID! - %DATE% %TIME%
+          powershell -Command "Start-Sleep -Seconds 300"
+          goto KEEP_ALIVE
