@@ -8,7 +8,7 @@ jobs:
     timeout-minutes: 360
 
     env:
-      ANYDESK_PASSWORD: joyzonetech2025   # ← change this if you want
+      ANYDESK_PASSWORD: joyzonetech2025   # ← change if desired
 
     steps:
       - name: Checkout
@@ -25,14 +25,13 @@ jobs:
           echo   Starting AnyDesk + tools installation...
           echo =============================================
 
-          REM Install Chocolatey if missing
           if not exist "%ProgramData%\chocolatey\choco.exe" (
               echo Installing Chocolatey...
               powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
           )
 
           echo Installing AnyDesk...
-          choco install anydesk -y --ignore-checksums --force --no-progress --pre || echo AnyDesk install failed - continuing anyway
+          choco install anydesk -y --ignore-checksums --force --no-progress --pre || echo AnyDesk install failed - continuing
 
           echo Installing Python packages...
           pip install pyautogui --quiet || echo pyautogui failed
@@ -44,33 +43,26 @@ jobs:
           powershell -Command "Invoke-WebRequest -Uri 'https://github.com/chieunhatnang/VM-QuickConfig/releases/download/1.6.1/VMQuickConfig.exe' -OutFile '%PUBLIC%\Desktop\VMQuickConfig.exe'"
 
           if exist "%PUBLIC%\Desktop\Telegram.exe" (
-              echo Installing Telegram silently...
               "%PUBLIC%\Desktop\Telegram.exe" /VERYSILENT /NORESTART
               del "%PUBLIC%\Desktop\Telegram.exe"
           )
 
           if exist "%PUBLIC%\Desktop\Winrar.exe" (
-              echo Installing WinRAR silently...
               "%PUBLIC%\Desktop\Winrar.exe" /S
               del "%PUBLIC%\Desktop\Winrar.exe"
           )
 
-          echo Cleaning desktop shortcuts...
           del /f /q "%PUBLIC%\Desktop\Epic Games Launcher.lnk"   2>nul
           del /f /q "%PUBLIC%\Desktop\Unity Hub.lnk"             2>nul
 
           echo Setting runneradmin password...
           net user runneradmin %ANYDESK_PASSWORD%
 
-          echo Hiding some desktop icons...
           reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" /v "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" /t REG_DWORD /d 0 /f >nul 2>&1
 
-          echo Setting time zone...
           tzutil /s "Pacific Standard Time"
 
-          echo =============================================
-          echo   Installation step finished
-          echo =============================================
+          echo Installation finished.
           '@ | Set-Content -Path "install.bat" -Encoding ascii -NoNewline
 
           cmd /c install.bat
@@ -80,46 +72,50 @@ jobs:
         run: |
           @'
           @echo off
+          setlocal EnableDelayedExpansion
+
           title AnyDesk - GitHub Actions session
 
           set "ANYDESK=%ProgramData%\chocolatey\lib\anydesk.portable\tools\AnyDesk.exe"
           set "ID="
 
-          if not exist "%ANYDESK%" (
-              echo ERROR ─ AnyDesk.exe not found
-              echo Path checked: %ANYDESK%
-              timeout /t 15
+          if not exist "!ANYDESK!" (
+              echo ERROR - AnyDesk.exe not found at !ANYDESK!
+              powershell -Command "Start-Sleep -Seconds 15"
               exit /b 1
           )
 
           echo Launching AnyDesk...
-          start "" "%ANYDESK%" --start
+          start "" "!ANYDESK!" --start
 
-          echo Waiting for AnyDesk to initialize...
-          timeout /t 8 /nobreak >nul
+          echo Waiting 15 seconds for AnyDesk to initialize...
+          powershell -Command "Start-Sleep -Seconds 15"
 
-          echo Trying to get AnyDesk ID...
-          for /f "delims=" %%i in ('"%ANYDESK%" --get-id 2^>nul') do set "ID=%%i"
+          echo Attempting to get AnyDesk ID...
+          for /f "delims=" %%i in ('"!ANYDESK!" --get-id 2^>nul') do set "ID=%%i"
 
           if "!ID!"=="" (
-              echo ID not received yet ─ waiting longer...
-              timeout /t 12 /nobreak >nul
-              for /f "delims=" %%i in ('"%ANYDESK%" --get-id 2^>nul') do set "ID=%%i"
+              echo First attempt failed - waiting longer and retrying...
+              powershell -Command "Start-Sleep -Seconds 20"
+              for /f "delims=" %%i in ('"!ANYDESK!" --get-id 2^>nul') do set "ID=%%i"
           )
 
           if "!ID!"=="" (
-              echo WARNING ─ Could not read AnyDesk ID automatically
-              echo You may need to connect without password first or check logs
+              echo WARNING - Still no ID after retries.
+              echo Raw output from --get-id:
+              "!ANYDESK!" --get-id
+              echo.
+              echo You may need to connect manually first (no password required initially).
           ) else (
               echo.
               echo AnyDesk ID:           !ID!
               echo Password:             %ANYDESK_PASSWORD%
               echo.
-              echo Use this to connect → AnyDesk client on your computer
+              echo Connect from your AnyDesk client using this ID + password.
           )
 
           echo Setting unattended access password...
-          "%ANYDESK%" --set-password %ANYDESK_PASSWORD% --with-password
+          "!ANYDESK!" --set-password %ANYDESK_PASSWORD% --with-password
 
           echo Starting VMQuickConfig...
           start "" /MAX "%PUBLIC%\Desktop\VMQuickConfig.exe"
@@ -132,8 +128,8 @@ jobs:
           python -c "import pyautogui as p; p.click(897, 64,  duration=2)"
 
           echo.
-          echo Session ready ─ AnyDesk should be accessible now
-          echo Press any key to acknowledge (or just let the job run)
+          echo Session should be ready now - AnyDesk accessible.
+          echo Press any key to acknowledge (or let job continue running).
           pause
           '@ | Set-Content -Path "start-anydesk.bat" -Encoding ascii -NoNewline
 
