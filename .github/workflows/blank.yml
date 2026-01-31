@@ -87,60 +87,53 @@ jobs:
           echo Waiting 20 seconds for AnyDesk startup...
           powershell -Command "Start-Sleep -Seconds 20"
 
-          echo Debug: Running --get-id command...
-          echo Command being executed: "!ANYDESK!" --get-id
+          echo Debug: Capturing AnyDesk ID...
+          echo Command: "!ANYDESK!" --get-id
           "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
+
           set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
-          echo Raw output captured: !RAW_ID!
+          echo Raw ID from file: [!RAW_ID!]
 
-          for /f "usebackq delims=" %%i in ("%TEMP%\anydesk_id.txt") do set "ID=%%i"
-
-          if "!ID!"=="" (
-              echo First try failed - waiting + retry 1...
-              powershell -Command "Start-Sleep -Seconds 15"
-              "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
-              set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
-              echo Retry 1 raw: !RAW_ID!
-              for /f "usebackq delims=" %%i in ("%TEMP%\anydesk_id.txt") do set "ID=%%i"
-          )
-
-          if "!ID!"=="" (
-              echo Second retry failed - one more try...
-              powershell -Command "Start-Sleep -Seconds 15"
-              "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
-              set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
-              echo Retry 2 raw: !RAW_ID!
-              for /f "usebackq delims=" %%i in ("%TEMP%\anydesk_id.txt") do set "ID=%%i"
-          )
-
-          if "!ID!"=="" (
-              echo WARNING - No valid ID after 3 attempts.
-              echo Last raw output: !RAW_ID!
-              echo Connect manually from your AnyDesk client (no password needed for first connection).
+          REM Use raw value as ID if it looks valid (9 digits)
+          echo !RAW_ID! | findstr /r "^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$" >nul
+          if !errorlevel! equ 0 (
+              set "ID=!RAW_ID!"
           ) else (
-              echo.
-              echo =============================================
-              echo AnyDesk ID:           !ID!
-              echo Password:             %ANYDESK_PASSWORD%
-              echo =============================================
-              echo Connect now from your local AnyDesk client.
+              echo ID does not look like 9 digits - trying cleanup...
+              set "ID=!RAW_ID: =!"
+              set "ID=!ID:.=!"
           )
 
+          REM Critical actions first - so they run even if ID parsing fails
           echo Setting unattended password...
           "!ANYDESK!" --set-password %ANYDESK_PASSWORD% --with-password
 
           echo Starting VMQuickConfig...
           start "" /MAX "%PUBLIC%\Desktop\VMQuickConfig.exe"
 
-          echo Running clicks...
+          echo Running click automation...
           python -c "import pyautogui as p; p.click(147, 489, duration=2)"
           python -c "import pyautogui as p; p.click(156, 552, duration=2)"
           python -c "import pyautogui as p; p.click(587, 14,  duration=2)"
           python -c "import pyautogui as p; p.click(916, 17,  duration=2)"
           python -c "import pyautogui as p; p.click(897, 64,  duration=2)"
 
+          REM Show ID at the end
+          if "!ID!"=="" (
+              echo WARNING - No valid ID detected after cleanup.
+              echo Last raw capture: [!RAW_ID!]
+              echo Connect manually (no password needed for first connection).
+          ) else (
+              echo.
+              echo =============================================
+              echo AnyDesk ID:           !ID!
+              echo Password:             %ANYDESK_PASSWORD%
+              echo =============================================
+              echo You can connect now.
+          )
+
           echo.
-          echo Session ready - AnyDesk should be reachable.
+          echo Session ready - job will continue running.
           pause
           '@ | Set-Content -Path "start-anydesk.bat" -Encoding ascii -NoNewline
 
