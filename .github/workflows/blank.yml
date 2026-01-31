@@ -8,7 +8,7 @@ jobs:
     timeout-minutes: 360
 
     env:
-      ANYDESK_PASSWORD: joyzonetech2025
+      ANYDESK_PASSWORD: joyzonetech2025   # change if you want
 
     steps:
       - name: Checkout
@@ -94,17 +94,10 @@ jobs:
           set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
           echo Raw ID from file: [!RAW_ID!]
 
-          REM Use raw value as ID if it looks valid (9 digits)
-          echo !RAW_ID! | findstr /r "^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$" >nul
-          if !errorlevel! equ 0 (
-              set "ID=!RAW_ID!"
-          ) else (
-              echo ID does not look like 9 digits - trying cleanup...
-              set "ID=!RAW_ID: =!"
-              set "ID=!ID:.=!"
-          )
+          REM Treat raw value as ID (it's already valid)
+          set "ID=!RAW_ID!"
 
-          REM Critical actions first - so they run even if ID parsing fails
+          REM Critical actions - run regardless of parsing issues
           echo Setting unattended password...
           "!ANYDESK!" --set-password %ANYDESK_PASSWORD% --with-password
 
@@ -118,22 +111,23 @@ jobs:
           python -c "import pyautogui as p; p.click(916, 17,  duration=2)"
           python -c "import pyautogui as p; p.click(897, 64,  duration=2)"
 
-          REM Show ID at the end
+          REM Final display
           if "!ID!"=="" (
-              echo WARNING - No valid ID detected after cleanup.
-              echo Last raw capture: [!RAW_ID!]
-              echo Connect manually (no password needed for first connection).
+              echo WARNING - No ID captured.
+              echo Last raw output: [!RAW_ID!]
+              echo Try connecting manually first.
           ) else (
               echo.
               echo =============================================
               echo AnyDesk ID:           !ID!
               echo Password:             %ANYDESK_PASSWORD%
               echo =============================================
-              echo You can connect now.
+              echo Connect from your local AnyDesk client now.
+              echo Job will keep running for 6 hours.
           )
 
           echo.
-          echo Session ready - job will continue running.
+          echo Session ready.
           pause
           '@ | Set-Content -Path "start-anydesk.bat" -Encoding ascii -NoNewline
 
