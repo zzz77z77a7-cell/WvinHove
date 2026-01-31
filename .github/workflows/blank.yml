@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     name: Start Building...
-    runs-on: windows-2022
+    runs-on: windows-latest
     timeout-minutes: 10080  # Máximo de 7 dias para evitar tempo de execução excessivo
 
     steps:
