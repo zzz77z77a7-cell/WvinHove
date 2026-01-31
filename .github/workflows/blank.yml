@@ -8,7 +8,7 @@ jobs:
     timeout-minutes: 360
 
     env:
-      ANYDESK_PASSWORD: joyzonetech2025   # ← change if desired
+      ANYDESK_PASSWORD: joyzonetech2025
 
     steps:
       - name: Checkout
@@ -30,14 +30,11 @@ jobs:
               powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
           )
 
-          echo Installing AnyDesk...
           choco install anydesk -y --ignore-checksums --force --no-progress --pre || echo AnyDesk install failed - continuing
 
-          echo Installing Python packages...
           pip install pyautogui --quiet || echo pyautogui failed
           pip install psutil   --quiet || echo psutil failed
 
-          echo Downloading extras...
           curl -s -L -o "%PUBLIC%\Desktop\Telegram.exe"     https://telegram.org/dl/desktop/win64
           curl -s -L -o "%PUBLIC%\Desktop\Winrar.exe"       https://www.rarlab.com/rar/winrar-x64-621.exe
           powershell -Command "Invoke-WebRequest -Uri 'https://github.com/chieunhatnang/VM-QuickConfig/releases/download/1.6.1/VMQuickConfig.exe' -OutFile '%PUBLIC%\Desktop\VMQuickConfig.exe'"
@@ -55,7 +52,6 @@ jobs:
           del /f /q "%PUBLIC%\Desktop\Epic Games Launcher.lnk"   2>nul
           del /f /q "%PUBLIC%\Desktop\Unity Hub.lnk"             2>nul
 
-          echo Setting runneradmin password...
           net user runneradmin %ANYDESK_PASSWORD%
 
           reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" /v "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" /t REG_DWORD /d 0 /f >nul 2>&1
@@ -81,46 +77,62 @@ jobs:
 
           if not exist "!ANYDESK!" (
               echo ERROR - AnyDesk.exe not found at !ANYDESK!
-              powershell -Command "Start-Sleep -Seconds 15"
+              powershell -Command "Start-Sleep -Seconds 20"
               exit /b 1
           )
 
           echo Launching AnyDesk...
           start "" "!ANYDESK!" --start
 
-          echo Waiting 15 seconds for AnyDesk to initialize...
-          powershell -Command "Start-Sleep -Seconds 15"
+          echo Waiting 20 seconds for AnyDesk startup...
+          powershell -Command "Start-Sleep -Seconds 20"
 
-          echo Attempting to get AnyDesk ID...
-          for /f "delims=" %%i in ('"!ANYDESK!" --get-id 2^>nul') do set "ID=%%i"
+          echo Debug: Running --get-id command...
+          echo Command being executed: "!ANYDESK!" --get-id
+          "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
+          set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
+          echo Raw output captured: !RAW_ID!
+
+          for /f "usebackq delims=" %%i in ("%TEMP%\anydesk_id.txt") do set "ID=%%i"
 
           if "!ID!"=="" (
-              echo First attempt failed - waiting longer and retrying...
-              powershell -Command "Start-Sleep -Seconds 20"
-              for /f "delims=" %%i in ('"!ANYDESK!" --get-id 2^>nul') do set "ID=%%i"
+              echo First try failed - waiting + retry 1...
+              powershell -Command "Start-Sleep -Seconds 15"
+              "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
+              set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
+              echo Retry 1 raw: !RAW_ID!
+              for /f "usebackq delims=" %%i in ("%TEMP%\anydesk_id.txt") do set "ID=%%i"
           )
 
           if "!ID!"=="" (
-              echo WARNING - Still no ID after retries.
-              echo Raw output from --get-id:
-              "!ANYDESK!" --get-id
-              echo.
-              echo You may need to connect manually first (no password required initially).
+              echo Second retry failed - one more try...
+              powershell -Command "Start-Sleep -Seconds 15"
+              "!ANYDESK!" --get-id > "%TEMP%\anydesk_id.txt" 2>&1
+              set /p RAW_ID=<"%TEMP%\anydesk_id.txt"
+              echo Retry 2 raw: !RAW_ID!
+              for /f "usebackq delims=" %%i in ("%TEMP%\anydesk_id.txt") do set "ID=%%i"
+          )
+
+          if "!ID!"=="" (
+              echo WARNING - No valid ID after 3 attempts.
+              echo Last raw output: !RAW_ID!
+              echo Connect manually from your AnyDesk client (no password needed for first connection).
           ) else (
               echo.
+              echo =============================================
               echo AnyDesk ID:           !ID!
               echo Password:             %ANYDESK_PASSWORD%
-              echo.
-              echo Connect from your AnyDesk client using this ID + password.
+              echo =============================================
+              echo Connect now from your local AnyDesk client.
           )
 
-          echo Setting unattended access password...
+          echo Setting unattended password...
           "!ANYDESK!" --set-password %ANYDESK_PASSWORD% --with-password
 
           echo Starting VMQuickConfig...
           start "" /MAX "%PUBLIC%\Desktop\VMQuickConfig.exe"
 
-          echo Running click automation...
+          echo Running clicks...
           python -c "import pyautogui as p; p.click(147, 489, duration=2)"
           python -c "import pyautogui as p; p.click(156, 552, duration=2)"
           python -c "import pyautogui as p; p.click(587, 14,  duration=2)"
@@ -128,8 +140,7 @@ jobs:
           python -c "import pyautogui as p; p.click(897, 64,  duration=2)"
 
           echo.
-          echo Session should be ready now - AnyDesk accessible.
-          echo Press any key to acknowledge (or let job continue running).
+          echo Session ready - AnyDesk should be reachable.
           pause
           '@ | Set-Content -Path "start-anydesk.bat" -Encoding ascii -NoNewline
 
